@@ -40,12 +40,15 @@ router.post('/', async (req, res) => {
     city: req.body.city,
     country: req.body.country,
   });
-  user = await user.save();
-
+  try {
+    user = await user.save();
+  } catch (error) {
+    return res.status(302).send('Email already exists.');
+  }
   if (!user) {
     return res.status(404).send('the user cannot be created!');
   }
-  return res.send(user);
+  return res.status(201).send(user);
 });
 
 router.put('/:id', async (req, res) => {

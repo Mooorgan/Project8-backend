@@ -4,6 +4,7 @@ const multer = require('multer');
 
 const { Product } = require('../models/product');
 const { Category } = require('../models/category');
+const { User } = require('../models/user');
 
 const router = express.Router();
 
@@ -49,6 +50,133 @@ router.get(`/:id`, async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).send('Invalid Product id');
   }
+  if (req.headers.authorization) {
+    const extraction = req.headers.authorization.split(' ')[1];
+    const extraction1 = atob(extraction.split('.')[1]);
+    const extraction1Parsed = JSON.parse(extraction1);
+    // console.log(typeof extraction1Parsed);
+    console.log(extraction1Parsed);
+    const uid = extraction1Parsed.userId;
+
+    // if (req.headers.authorization && !extraction1Parsed.isAdmin) {
+    if (req.headers.authorization) {
+      console.log('user id is', uid);
+      // const targetUser=await User.findById(uid);
+
+      const updatedProduct = await Product.findById(req.params.id);
+
+      const numTimeRecorded = +updatedProduct.timeRecorded;
+      console.log('Time recorded is', numTimeRecorded);
+      // console.log(typeof numTimeRecorded, numTimeRecorded);
+      console.log('Timecount is', updatedProduct.timeCount);
+      const addSec = updatedProduct.timeCount * 1000;
+      console.log('Addition second is', addSec);
+      const futureTime = numTimeRecorded + addSec;
+      console.log('Time future is', futureTime);
+      console.log(Date.now() > futureTime);
+
+      if (Date.now() > futureTime) {
+        console.log('updated product.priceMin is', updatedProduct.priceMin);
+        updatedProduct.price = updatedProduct.priceMin;
+        updatedProduct.timeRecorded = '';
+        updatedProduct.viewsCount = 0;
+        console.log(updatedProduct.viewsCount);
+        updatedProduct.viewsId = [];
+      }
+
+      const found = updatedProduct.viewsId.find((id) => {
+        return id === uid;
+      });
+
+      if (!found) {
+        updatedProduct.viewsId.push(uid);
+        console.log('pushed is', updatedProduct.viewsId);
+        updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
+        updatedProduct.timeRecorded = Date.now().toString();
+      } else {
+        // updatedProduct.viewsId.push(uid);
+        // updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
+        updatedProduct.timeRecorded = Date.now().toString();
+      }
+
+      if (updatedProduct.viewsCount > updatedProduct.thresholdCount) {
+        console.log('viewscount current', updatedProduct.viewsCount);
+        console.log('thresholdcount current', updatedProduct.thresholdCount);
+        console.log('Max price is', updatedProduct.priceMax);
+        updatedProduct.price = updatedProduct.priceMax;
+      }
+
+      // console.log(typeof updatedProduct, updatedProduct);
+      // const found = updatedProduct.viewsId.find((id) => {
+      //   return id === uid;
+      // });
+      // const numTimeRecorded = +updatedProduct.timeRecorded;
+      // console.log('Time recorded is', numTimeRecorded);
+      // // console.log(typeof numTimeRecorded, numTimeRecorded);
+      // console.log('Timecount is', updatedProduct.timeCount);
+      // const addSec = updatedProduct.timeCount * 1000;
+      // console.log('Addition second is', addSec);
+      // const futureTime = numTimeRecorded + addSec;
+      // console.log('Time future is', futureTime);
+      // console.log(Date.now() > futureTime);
+      // if (Date.now() > futureTime) {
+      //   console.log('updated product.priceMin is', updatedProduct.priceMin);
+      //   updatedProduct.price = updatedProduct.priceMin;
+      //   updatedProduct.timeRecorded = '';
+      //   updatedProduct.viewsCount = 0;
+      //   console.log(updatedProduct.viewsCount);
+      //   updatedProduct.viewsId = '';
+      //   updatedProduct.viewsId.push(uid);
+      //   updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
+      //   updatedProduct.timeRecorded = Date.now().toString();
+      //   console.log('Executred Time greater');
+      // }
+      // if (!found) {
+      //   updatedProduct.viewsId.push(uid);
+      //   console.log('pushed is', updatedProduct.viewsId);
+      //   updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
+      //   updatedProduct.timeRecorded = Date.now().toString();
+      // } else {
+      //   // updatedProduct.viewsId.push(uid);
+      //   // updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
+      //   updatedProduct.timeRecorded = Date.now().toString();
+      //   if (updatedProduct.viewsCount > updatedProduct.thresholdCount) {
+      //     updatedProduct.price = updatedProduct.priceMax;
+      //   }
+      // }
+
+      // console.log(updatedProduct);
+      const storeProduct = await Product.findByIdAndUpdate(
+        req.params.id,
+        {
+          // name: req.body.name,
+          // description: req.body.description,
+          // richDescription: req.body.richDescription,
+          // image: imagePath,
+          // brand: req.body.brand,
+          price: updatedProduct.price,
+          // priceMax: req.body.priceMax,
+          // priceMin: req.body.price,
+          // thresholdCount: req.body.thresholdCount,
+          // timeCount: req.body.timeCount,
+          // category: req.body.category,
+          // countInStock: req.body.countInStock,
+          // rating: req.body.rating,
+          // numReviews: req.body.numReviews,
+          // isFeatured: req.body.isFeatured,
+          timeRecorded: updatedProduct.timeRecorded,
+          viewsCount: updatedProduct.viewsCount,
+          viewsId: updatedProduct.viewsId,
+        },
+        { new: true }
+      );
+      console.log(storeProduct);
+      console.log('Hellooooooooooooooooooooo');
+      // console.log(typeof uid, uid);
+    }
+    // console.log(typeof req.params.id);
+  }
+
   const product = await Product.findById(req.params.id);
   if (!product) {
     res.status(500).json({
@@ -79,6 +207,12 @@ router.post(`/`, uploadOptions.single('image'), async (req, res) => {
     image: `${basePath}${fileName}`,
     brand: req.body.brand,
     price: req.body.price,
+    priceMax: req.body.priceMax,
+    priceMin: req.body.price,
+    thresholdCount: req.body.thresholdCount,
+    timeCount: req.body.timeCount,
+    // timeRecorded:new Date(),
+    // viewsCount:req.body.viewsCount,
     category: req.body.category,
     countInStock: req.body.countInStock,
     rating: req.body.rating,
@@ -109,6 +243,7 @@ router.put('/:id', uploadOptions.single('image'), async (req, res) => {
   }
 
   const file = req.file;
+
   let imagePath;
   if (file) {
     const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
@@ -127,6 +262,10 @@ router.put('/:id', uploadOptions.single('image'), async (req, res) => {
       image: imagePath,
       brand: req.body.brand,
       price: req.body.price,
+      priceMax: req.body.priceMax,
+      priceMin: req.body.price,
+      thresholdCount: req.body.thresholdCount,
+      timeCount: req.body.timeCount,
       category: req.body.category,
       countInStock: req.body.countInStock,
       rating: req.body.rating,
@@ -197,6 +336,7 @@ router.put(
       return res.status(400).send('Invalid Product id');
     }
     const files = req.files;
+
     let imagesPath = [];
     const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
 
@@ -205,6 +345,7 @@ router.put(
         imagesPath.push(`${basePath}${file.filename}`);
       });
     }
+
     const product = await Product.findByIdAndUpdate(
       req.params.id,
       {

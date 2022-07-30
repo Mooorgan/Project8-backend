@@ -30,6 +30,33 @@ const productSchema = mongoose.Schema({
     type: Number,
     required: true,
   },
+  priceMax: {
+    type: Number,
+    required: true,
+  },
+  priceMin: {
+    type: Number,
+  },
+  viewsId: [
+    {
+      type: String,
+    },
+  ],
+  viewsCount: {
+    type: Number,
+    default: 0,
+  },
+  thresholdCount: {
+    type: Number,
+    required: true,
+  },
+  timeRecorded: {
+    type: String,
+  },
+  timeCount: {
+    type: Number,
+    required: true,
+  },
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
