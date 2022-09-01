@@ -38,6 +38,13 @@ router.get(`/:id`, async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
+  console.log(
+    '-----------------------------------------------------------------------------'
+  );
+  console.log(req.body.orderItems);
+  console.log(
+    '-----------------------------------------------------------------------------'
+  );
   const orderItemsIds = Promise.all(
     req.body.orderItems.map(async (orderitem) => {
       let newOrderItem = new OrderItem({
@@ -73,19 +80,38 @@ router.post('/', async (req, res) => {
     shippingAddress1: req.body.shippingAddress1,
     shippingAddress2: req.body.shippingAddress2,
     city: req.body.city,
-    zip: req.body.zip,
-    country: req.body.country,
+    zip: req.body.zip.trim(),
+    country: req.body.country.trim(),
     phone: req.body.phone,
     status: req.body.status,
     totalPrice: totalPrice,
-    user: req.body.user,
+    user: req.body.user.trim(),
+    longitude: req.body.longitude,
+    latitude: req.body.latitude,
   });
   order = await order.save();
-
+  if (order) {
+    const states = req.body.orderItems;
+    for (const prod of states) {
+      const productId = prod.product;
+      const quan = +prod.quantity;
+      const productTarget = await Product.findById(productId);
+      console.log(productTarget, '*******************************');
+      const targetProductQuantity = +productTarget.countInStock;
+      const updatedProduct = await Product.findByIdAndUpdate(
+        productId,
+        {
+          countInStock: targetProductQuantity - quan,
+        },
+        { new: true }
+      );
+    }
+  }
   if (!order) {
     return res.status(404).send('the order cannot be created!');
+  } else {
+    return res.send(order);
   }
-  return res.send(order);
 });
 
 router.post('/create-checkout-session', async (req, res) => {
@@ -184,18 +210,31 @@ router.get(`/get/count`, (req, res) => {
 });
 
 router.get(`/get/userorders/:userid`, async (req, res) => {
-  const userOrderList = await Order.find({ user: req.params.userid })
-    .populate({
-      path: 'orderItems',
-      populate: { path: 'product', populate: 'category' },
-    })
-    .sort({ dateOrdered: -1 });
-  if (!userOrderList) {
+  try {
+    const userOrderList = await Order.find({ user: req.params.userid })
+      .populate({
+        path: 'orderItems',
+        populate: { path: 'product', populate: 'category' },
+      })
+      .sort({ dateOrdered: -1 });
+    res.send(userOrderList);
+  } catch (err) {
     res.status(500).json({
       success: false,
     });
   }
-  res.send(userOrderList);
+  // const userOrderList = await Order.find({ user: req.params.userid })
+  //   .populate({
+  //     path: 'orderItems',
+  //     populate: { path: 'product', populate: 'category' },
+  //   })
+  //   .sort({ dateOrdered: -1 });
+  // if (!userOrderList) {
+  //   res.status(500).json({
+  //     success: false,
+  //   });
+  // }
+  // res.send(userOrderList);
 });
 
 module.exports = router;

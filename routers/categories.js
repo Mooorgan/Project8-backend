@@ -1,6 +1,7 @@
 const express = require('express');
 
 const { Category } = require('../models/category');
+const { Product } = require('../models/product');
 
 const router = express.Router();
 
@@ -26,7 +27,7 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', async (req, res) => {
   let category = new Category({
-    name: req.body.name,
+    name: req.body.name.trim(),
     icon: req.body.icon,
     color: req.body.color,
   });
@@ -42,7 +43,7 @@ router.put('/:id', async (req, res) => {
   const category = await Category.findByIdAndUpdate(
     req.params.id,
     {
-      name: req.body.name,
+      name: req.body.name.trim(),
       icon: req.body.icon,
       color: req.body.color,
     },
@@ -54,7 +55,7 @@ router.put('/:id', async (req, res) => {
   return res.send(category);
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   Category.findByIdAndRemove(req.params.id)
     .then((category) => {
       if (category) {
@@ -69,6 +70,7 @@ router.delete('/:id', (req, res) => {
     .catch((err) => {
       return res.status(400).json({ success: false, error: err });
     });
+  const delproduct = await Product.deleteMany({ category: req.params.id });
 });
 
 module.exports = router;

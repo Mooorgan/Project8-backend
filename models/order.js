@@ -47,6 +47,14 @@ const orderSchema = mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  longitude: {
+    type: String,
+    required: true,
+  },
+  latitude: {
+    type: String,
+    required: true,
+  },
 });
 
 orderSchema.virtual('id').get(function () {

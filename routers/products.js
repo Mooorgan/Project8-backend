@@ -33,17 +33,174 @@ const storage = multer.diskStorage({
 const uploadOptions = multer({ storage: storage });
 
 router.get(`/`, async (req, res) => {
-  let filter = {};
-  if (req.query.categories) {
-    filter = { category: req.query.categories.split(',') };
+  console.log(req.query.categories);
+  if (req.headers.authorization) {
+    const extraction = req.headers.authorization.split(' ')[1];
+    const extraction1 = atob(extraction.split('.')[1]);
+    const extraction1Parsed = JSON.parse(extraction1);
+    // console.log(typeof extraction1Parsed);
+    console.log(extraction1Parsed);
+    const uid = extraction1Parsed.userId;
+    console.log('user id is', uid);
+
+    const user = await User.findById(uid).select('-passwordHash');
+    if (!user) {
+      return res
+        .status(500)
+        .json({ message: 'The user with the given id is not found' });
+    }
+    const latitude = user.latitude;
+    const longitude = user.longitude;
+
+    if (req.headers.authorization && !extraction1Parsed.isAdmin) {
+      console.log('Entered because normal customers');
+      // let filter = {
+      //   $or: [
+      //     {
+      //       location: {
+      //         $geoIntersects: {
+      //           $geometry: {
+      //             type: 'Point',
+      //             coordinates: [longitude, latitude],
+      //           },
+      //         },
+      //       },
+      //     },
+      //     { geography: 'No' },
+      //   ],
+      // };
+      console.log(longitude, latitude);
+      let filter = {
+        $or: [
+          {
+            location: {
+              $geoIntersects: {
+                $geometry: {
+                  type: 'Point',
+                  coordinates: [longitude, latitude],
+                },
+              },
+            },
+          },
+          { geography: 'No' },
+        ],
+      };
+      // let filter = {};
+
+      if (req.query.categories) {
+        filter = {
+          $and: [
+            {
+              category: req.query.categories.split(','),
+            },
+            {
+              $or: [
+                {
+                  location: {
+                    $geoIntersects: {
+                      $geometry: {
+                        type: 'Point',
+                        coordinates: [longitude, latitude],
+                      },
+                    },
+                  },
+                },
+                { geography: 'No' },
+              ],
+            },
+          ],
+        };
+        // const filter = {
+        //   category: req.query.categories.split(','),
+        // };
+        // const filterF = {
+        //   $or: [
+        //     {
+        //       location: {
+        //         $geoIntersects: {
+        //           $geometry: {
+        //             type: 'Point',
+        //             coordinates: [longitude, latitude],
+        //           },
+        //         },
+        //       },
+        //     },
+        //     { geography: 'No' },
+        //   ],
+        // };
+        //  const productListQ = await Product.find(filterQ).populate('category');
+        // const productListFinal=await Product.find(filter)
+      }
+
+      console.log(filter, 'Filter for normal customers');
+      // const heyy = {
+      //   type: 'Point',
+      //   coordinates: [longitude, latitude],
+      // };
+      const productList = await Product.find(filter).populate('category');
+      // const productList = await Product.find({
+      // geography: 'Yes',
+      // location: {
+      //   $geoIntersects: {
+      //     // $geometry: {
+      //     //   type: 'Point',
+      //     //   coordinates: [longitude, latitude],
+      //     // },
+      //     $geometry: heyy,
+      //   },
+      // },
+      // }).populate('category');
+      // const productList = await Product.find({})
+      //   .where('location')
+      //   .intersects()
+      //   .geometry({
+      //     type: 'Point',
+      //     coordinates: [longitude, latitude],
+      //   })
+      //   .populate('category');
+      console.log('Product List', productList, 'This is product list');
+      if (!productList) {
+        console.log('No product list');
+        res.status(500).json({
+          success: false,
+        });
+      } else {
+        res.send(productList);
+      }
+    } else {
+      console.log('Entered because admin');
+      let filter = {};
+      if (req.query.categories) {
+        filter = {
+          category: req.query.categories.split(','),
+        };
+      }
+      console.log(filter);
+      const productList = await Product.find(filter).populate('category');
+      if (!productList) {
+        res.status(500).json({
+          success: false,
+        });
+      }
+      res.send(productList);
+    }
+  } else {
+    console.log('Entered because not logged in');
+    let filter = {};
+    if (req.query.categories) {
+      filter = {
+        category: req.query.categories.split(','),
+      };
+    }
+    console.log(filter);
+    const productList = await Product.find(filter).populate('category');
+    if (!productList) {
+      res.status(500).json({
+        success: false,
+      });
+    }
+    res.send(productList);
   }
-  const productList = await Product.find(filter).populate('category');
-  if (!productList) {
-    res.status(500).json({
-      success: false,
-    });
-  }
-  res.send(productList);
 });
 
 router.get(`/:id`, async (req, res) => {
@@ -58,8 +215,8 @@ router.get(`/:id`, async (req, res) => {
     console.log(extraction1Parsed);
     const uid = extraction1Parsed.userId;
 
-    // if (req.headers.authorization && !extraction1Parsed.isAdmin) {
-    if (req.headers.authorization) {
+    if (req.headers.authorization && !extraction1Parsed.isAdmin) {
+      // if (req.headers.authorization) {
       console.log('user id is', uid);
       // const targetUser=await User.findById(uid);
 
@@ -201,9 +358,10 @@ router.post(`/`, uploadOptions.single('image'), async (req, res) => {
   const fileName = req.file.filename;
 
   const product1 = new Product({
-    name: req.body.name,
-    description: req.body.description,
-    richDescription: req.body.richDescription,
+    name: req.body.name.trim(),
+    description: req.body.description.trim(),
+    keywords: req.body.keywords.split(','),
+    richDescription: req.body.richDescription.trim(),
     image: `${basePath}${fileName}`,
     brand: req.body.brand,
     price: req.body.price,
@@ -218,6 +376,8 @@ router.post(`/`, uploadOptions.single('image'), async (req, res) => {
     rating: req.body.rating,
     numReviews: req.body.numReviews,
     isFeatured: req.body.isFeatured,
+    geography: 'No',
+    location: {},
   });
   const product = await product1.save();
   if (!product) {
@@ -256,9 +416,10 @@ router.put('/:id', uploadOptions.single('image'), async (req, res) => {
   const updatedProduct = await Product.findByIdAndUpdate(
     req.params.id,
     {
-      name: req.body.name,
-      description: req.body.description,
-      richDescription: req.body.richDescription,
+      name: req.body.name.trim(),
+      description: req.body.description.trim(),
+      keywords: req.body.keywords.split(','),
+      richDescription: req.body.richDescription.trim(),
       image: imagePath,
       brand: req.body.brand,
       price: req.body.price,
@@ -271,6 +432,150 @@ router.put('/:id', uploadOptions.single('image'), async (req, res) => {
       rating: req.body.rating,
       numReviews: req.body.numReviews,
       isFeatured: req.body.isFeatured,
+      // location: {
+      //   type: 'Polygon',
+      //   coordinates: [
+      //     [
+      //       [req.body.a1, req.body.a2],
+      //       [req.body.b1, req.body.b2],
+      //       [req.body.c1, req.body.c2],
+      //       [req.body.d1, req.body.d2],
+      //       [req.body.a1, req.body.a2],
+      //     ],
+      //   ],
+      // },
+    },
+    { new: true }
+  );
+  if (!updatedProduct) {
+    return res.status(500).send('the product cannot be updated!');
+  } else {
+    return res.send(updatedProduct);
+  }
+});
+
+router.put('/geo/:id', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).send('Invalid Product id');
+  }
+  const category = await Category.findById(req.body.category);
+  if (!category) {
+    return res.status(400).send('Invalid Category');
+  }
+
+  const productPrevious = await Product.findById(req.params.id);
+  if (!productPrevious) {
+    return res.status(400).send('Invalid Product!');
+  }
+
+  // const file = req.file;
+
+  // let imagePath;
+  // if (file) {
+  //   const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
+  //   const fileName = req.file.filename;
+  //   imagePath = `${basePath}${fileName}`;
+  // } else {
+  //   imagePath = productPrevious.image;
+  // }
+  console.log('Entering Calculation');
+  try {
+    const updatedProduct = await Product.findByIdAndUpdate(
+      req.params.id,
+      {
+        // name: req.body.name,
+        // description: req.body.description,
+        // richDescription: req.body.richDescription,
+        // image: imagePath,
+        // brand: req.body.brand,
+        // price: req.body.price,
+        // priceMax: req.body.priceMax,
+        // priceMin: req.body.price,
+        // thresholdCount: req.body.thresholdCount,
+        // timeCount: req.body.timeCount,
+        // category: req.body.category,
+        // countInStock: req.body.countInStock,
+        // rating: req.body.rating,
+        // numReviews: req.body.numReviews,
+        // isFeatured: req.body.isFeatured,
+        geography: 'Yes',
+        location: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [req.body.a1, req.body.a2],
+              [req.body.b1, req.body.b2],
+              [req.body.c1, req.body.c2],
+              [req.body.d1, req.body.d2],
+              [req.body.a1, req.body.a2],
+            ],
+          ],
+        },
+      },
+      { new: true }
+    );
+
+    console.log('Calculation Finished');
+
+    console.log(updatedProduct);
+    if (!updatedProduct) {
+      return res.status(500).send('the product cannot be updated!');
+    } else {
+      return res.send(updatedProduct);
+    }
+  } catch (error) {
+    return res.status(500).send('the product cannot be updated!');
+  }
+});
+
+router.put('/delgeo/:id', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).send('Invalid Product id');
+  }
+  const category = await Category.findById(req.body.category);
+  if (!category) {
+    return res.status(400).send('Invalid Category');
+  }
+
+  const productPrevious = await Product.findById(req.params.id);
+  if (!productPrevious) {
+    return res.status(400).send('Invalid Product!');
+  }
+
+  // const file = req.file;
+
+  // let imagePath;
+  // if (file) {
+  //   const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
+  //   const fileName = req.file.filename;
+  //   imagePath = `${basePath}${fileName}`;
+  // } else {
+  //   imagePath = productPrevious.image;
+  // }
+
+  const updatedProduct = await Product.findByIdAndUpdate(
+    req.params.id,
+    {
+      // name: req.body.name,
+      // description: req.body.description,
+      // richDescription: req.body.richDescription,
+      // image: imagePath,
+      // brand: req.body.brand,
+      // price: req.body.price,
+      // priceMax: req.body.priceMax,
+      // priceMin: req.body.price,
+      // thresholdCount: req.body.thresholdCount,
+      // timeCount: req.body.timeCount,
+      // category: req.body.category,
+      // countInStock: req.body.countInStock,
+      // rating: req.body.rating,
+      // numReviews: req.body.numReviews,
+      // isFeatured: req.body.isFeatured,
+      geography: 'No',
+      location: {
+        // type: 'Polygon',
+        // coordinates: [[[]]],
+      },
     },
     { new: true }
   );
@@ -319,13 +624,78 @@ router.get(`/get/count`, (req, res) => {
 
 router.get(`/get/featured/:count`, async (req, res) => {
   const count = req.params.count ? req.params.count : 0;
-  const products = await Product.find({ isFeatured: true }).limit(+count);
-  if (!products) {
-    res.status(500).json({
-      success: false,
-    });
+  if (req.headers.authorization) {
+    const extraction = req.headers.authorization.split(' ')[1];
+    const extraction1 = atob(extraction.split('.')[1]);
+    const extraction1Parsed = JSON.parse(extraction1);
+    // console.log(typeof extraction1Parsed);
+    console.log(extraction1Parsed);
+    const uid = extraction1Parsed.userId;
+    console.log('user id is', uid);
+
+    const user = await User.findById(uid).select('-passwordHash');
+    if (!user) {
+      return res
+        .status(500)
+        .json({ message: 'The user with the given id is not found' });
+    }
+    const latitude = user.latitude;
+    const longitude = user.longitude;
+
+    if (req.headers.authorization && !extraction1Parsed.isAdmin) {
+      const products = await Product.find({
+        $and: [
+          { isFeatured: true },
+          {
+            $or: [
+              {
+                location: {
+                  $geoIntersects: {
+                    $geometry: {
+                      type: 'Point',
+                      coordinates: [longitude, latitude],
+                    },
+                  },
+                },
+              },
+              { geography: 'No' },
+            ],
+          },
+        ],
+      }).limit(+count);
+      if (!products) {
+        return res.status(500).json({
+          success: false,
+        });
+      } else {
+        return res.send(products);
+      }
+    } else {
+      const products = await Product.find(
+        //  $and: [
+        { isFeatured: true }
+      ).limit(+count);
+      if (!products) {
+        return res.status(500).json({
+          success: false,
+        });
+      } else {
+        return res.send(products);
+      }
+    }
+  } else {
+    const products = await Product.find(
+      //  $and: [
+      { isFeatured: true }
+    ).limit(+count);
+    if (!products) {
+      return res.status(500).json({
+        success: false,
+      });
+    } else {
+      return res.send(products);
+    }
   }
-  res.send(products);
 });
 
 router.put(
@@ -360,5 +730,54 @@ router.put(
     return res.send(product);
   }
 );
+
+router.put('/review/:id', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).send('Invalid Product id');
+  }
+  const category = await Category.findById(req.body.category);
+  if (!category) {
+    return res.status(400).send('Invalid Category');
+  }
+  console.log(req.body.reviews);
+  console.log(req.params.id);
+  const updatedProduct = await Product.findByIdAndUpdate(
+    req.params.id,
+    {
+      $push: { reviews: req.body.reviews },
+    },
+    { new: true }
+  );
+  console.log(updatedProduct);
+  if (!updatedProduct) {
+    return res.status(500).send('the product cannot be updated!');
+  } else {
+    return res.send(updatedProduct);
+  }
+});
+
+router.put('/rating/:id', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).send('Invalid Product id');
+  }
+  const category = await Category.findById(req.body.category);
+  if (!category) {
+    return res.status(400).send('Invalid Category');
+  }
+
+  const updatedProduct = await Product.findByIdAndUpdate(
+    req.params.id,
+    {
+      rating: req.body.rating,
+      numReviews: req.body.numReviews,
+    },
+    { new: true }
+  );
+  if (!updatedProduct) {
+    return res.status(500).send('the product cannot be updated!');
+  } else {
+    return res.send(updatedProduct);
+  }
+});
 
 module.exports = router;

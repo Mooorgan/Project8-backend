@@ -9,6 +9,12 @@ const productSchema = mongoose.Schema({
     type: String,
     required: true,
   },
+  keywords: [
+    {
+      type: String,
+      required: true,
+    },
+  ],
   richDescription: {
     type: String,
     default: '',
@@ -76,6 +82,15 @@ const productSchema = mongoose.Schema({
     type: Number,
     default: 0,
   },
+  reviews: {
+    type: [
+      {
+        name: String,
+        review: String,
+      },
+    ],
+    default: undefined,
+  },
   isFeatured: {
     type: Boolean,
     default: false,
@@ -83,6 +98,20 @@ const productSchema = mongoose.Schema({
   dateCreated: {
     type: Date,
     default: Date.now,
+  },
+  geography: {
+    type: String,
+    default: 'No',
+  },
+  location: {
+    type: {
+      type: String,
+      enum: ['Polygon'],
+    },
+    coordinates: {
+      type: [[[Number]]],
+      default: undefined,
+    },
   },
 });
 
