@@ -43,6 +43,16 @@ const userSchema = mongoose.Schema({
     type: String,
     default: '',
   },
+  userlocation: {
+    type: {
+      type: String,
+      enum: ['Point'],
+    },
+    coordinates: {
+      type: [Number],
+      default: undefined,
+    },
+  },
   longitude: {
     type: String,
     required: true,

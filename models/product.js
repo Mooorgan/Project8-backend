@@ -113,6 +113,20 @@ const productSchema = mongoose.Schema({
       default: undefined,
     },
   },
+  pgeography: {
+    type: String,
+    default: 'No',
+  },
+  plocation: {
+    type: {
+      type: String,
+      enum: ['Polygon'],
+    },
+    coordinates: {
+      type: [[[Number]]],
+      default: undefined,
+    },
+  },
 });
 
 productSchema.virtual('id').get(function () {

@@ -1,4 +1,5 @@
 const express = require('express');
+const axios = require('axios');
 
 const { Order } = require('../models/order');
 const { OrderItem } = require('../models/order-item');
@@ -127,7 +128,7 @@ router.post('/create-checkout-session', async (req, res) => {
       const product = await Product.findById(orderItem.product);
       return {
         price_data: {
-          currency: 'usd',
+          currency: 'inr',
           product_data: {
             name: product.name,
           },
@@ -145,6 +146,53 @@ router.post('/create-checkout-session', async (req, res) => {
     cancel_url: 'http://localhost:4200/error',
   });
   res.json({ id: session.id });
+});
+
+router.post('/create-checkout-session-khalti', async (req, res) => {
+  const gotToken = req.body.token;
+  const gotAmount = req.body.amount;
+  console.log(gotToken);
+  console.log(gotAmount);
+  let data = {
+    token: gotToken,
+    amount: gotAmount,
+  };
+  console.log(data);
+  console.log(
+    data.token,
+    typeof data.token,
+    '-----------------------------------------------------------'
+  );
+  console.log(data.amount, typeof data.amount);
+  let config = {
+    headers: {
+      Authorization: 'Key test_secret_key_1c29c97dd180462897bf3d160863729e',
+    },
+  };
+  console.log(config);
+  try {
+    const response = await axios.post(
+      'https://khalti.com/api/v2/payment/verify/',
+      data,
+      config
+    );
+    console.log(response);
+
+    return res.status(200).json(response.data);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json(err);
+  }
+  // axios
+  //   .post('https://khalti.com/api/v2/payment/verify/', data, config)
+  //   .then((response) => {
+  //     console.log(response);
+  //     return res.status(200).json(response.data);
+  //   })
+  //   .catch((error) => {
+  //     console.log(error);
+  //     return res.status(500).json(error);
+  //   });
 });
 
 router.put('/:id', async (req, res) => {

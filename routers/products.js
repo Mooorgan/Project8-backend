@@ -33,15 +33,15 @@ const storage = multer.diskStorage({
 const uploadOptions = multer({ storage: storage });
 
 router.get(`/`, async (req, res) => {
-  console.log(req.query.categories);
+  // console.log(req.query.categories);
   if (req.headers.authorization) {
     const extraction = req.headers.authorization.split(' ')[1];
     const extraction1 = atob(extraction.split('.')[1]);
     const extraction1Parsed = JSON.parse(extraction1);
     // console.log(typeof extraction1Parsed);
-    console.log(extraction1Parsed);
+    // console.log(extraction1Parsed);
     const uid = extraction1Parsed.userId;
-    console.log('user id is', uid);
+    // console.log('user id is', uid);
 
     const user = await User.findById(uid).select('-passwordHash');
     if (!user) {
@@ -49,11 +49,12 @@ router.get(`/`, async (req, res) => {
         .status(500)
         .json({ message: 'The user with the given id is not found' });
     }
-    const latitude = user.latitude;
-    const longitude = user.longitude;
+    const latitude = user.userlocation.coordinates[1];
+    const longitude = user.userlocation.coordinates[0];
+    // console.log(longitude, latitude, '----------------------------');
 
     if (req.headers.authorization && !extraction1Parsed.isAdmin) {
-      console.log('Entered because normal customers');
+      // console.log('Entered because normal customers');
       // let filter = {
       //   $or: [
       //     {
@@ -69,7 +70,7 @@ router.get(`/`, async (req, res) => {
       //     { geography: 'No' },
       //   ],
       // };
-      console.log(longitude, latitude);
+      // console.log(longitude, latitude);
       let filter = {
         $or: [
           {
@@ -132,7 +133,7 @@ router.get(`/`, async (req, res) => {
         // const productListFinal=await Product.find(filter)
       }
 
-      console.log(filter, 'Filter for normal customers');
+      // console.log(filter, 'Filter for normal customers');
       // const heyy = {
       //   type: 'Point',
       //   coordinates: [longitude, latitude],
@@ -158,9 +159,9 @@ router.get(`/`, async (req, res) => {
       //     coordinates: [longitude, latitude],
       //   })
       //   .populate('category');
-      console.log('Product List', productList, 'This is product list');
+      // console.log('Product List', productList, 'This is product list');
       if (!productList) {
-        console.log('No product list');
+        // console.log('No product list');
         res.status(500).json({
           success: false,
         });
@@ -168,14 +169,14 @@ router.get(`/`, async (req, res) => {
         res.send(productList);
       }
     } else {
-      console.log('Entered because admin');
+      // console.log('Entered because admin');
       let filter = {};
       if (req.query.categories) {
         filter = {
           category: req.query.categories.split(','),
         };
       }
-      console.log(filter);
+      // console.log(filter);
       const productList = await Product.find(filter).populate('category');
       if (!productList) {
         res.status(500).json({
@@ -185,14 +186,14 @@ router.get(`/`, async (req, res) => {
       res.send(productList);
     }
   } else {
-    console.log('Entered because not logged in');
+    // console.log('Entered because not logged in');
     let filter = {};
     if (req.query.categories) {
       filter = {
         category: req.query.categories.split(','),
       };
     }
-    console.log(filter);
+    // console.log(filter);
     const productList = await Product.find(filter).populate('category');
     if (!productList) {
       res.status(500).json({
@@ -212,135 +213,297 @@ router.get(`/:id`, async (req, res) => {
     const extraction1 = atob(extraction.split('.')[1]);
     const extraction1Parsed = JSON.parse(extraction1);
     // console.log(typeof extraction1Parsed);
-    console.log(extraction1Parsed);
+    // console.log(extraction1Parsed);
     const uid = extraction1Parsed.userId;
 
     if (req.headers.authorization && !extraction1Parsed.isAdmin) {
       // if (req.headers.authorization) {
       console.log('user id is', uid);
       // const targetUser=await User.findById(uid);
+      // const user = await User.findById(uid).select('-passwordHash');
 
+      // const longi = user.userlocation.coordinates[0];
+      // const lati = user.userlocation.coordinates[1];
+      // console.log(longi, lati);
       const updatedProduct = await Product.findById(req.params.id);
+      console.log(
+        updatedProduct,
+        '---------------------------------------------------------------------'
+      );
+      const valid = updatedProduct.plocation.coordinates;
 
-      const numTimeRecorded = +updatedProduct.timeRecorded;
-      console.log('Time recorded is', numTimeRecorded);
-      // console.log(typeof numTimeRecorded, numTimeRecorded);
-      console.log('Timecount is', updatedProduct.timeCount);
-      const addSec = updatedProduct.timeCount * 1000;
-      console.log('Addition second is', addSec);
-      const futureTime = numTimeRecorded + addSec;
-      console.log('Time future is', futureTime);
-      console.log(Date.now() > futureTime);
+      if (valid) {
+        const p1 = [
+          updatedProduct.plocation.coordinates[0][0][0],
+          updatedProduct.plocation.coordinates[0][0][1],
+        ];
+        const p2 = [
+          updatedProduct.plocation.coordinates[0][1][0],
+          updatedProduct.plocation.coordinates[0][1][1],
+        ];
+        const p3 = [
+          updatedProduct.plocation.coordinates[0][2][0],
+          updatedProduct.plocation.coordinates[0][2][1],
+        ];
+        const p4 = [
+          updatedProduct.plocation.coordinates[0][3][0],
+          updatedProduct.plocation.coordinates[0][3][1],
+        ];
+        const filter = {
+          userlocation: {
+            $geoWithin: {
+              $geometry: {
+                type: 'Polygon',
+                coordinates: [[p1, p2, p3, p4, p1]],
+              },
+            },
+          },
+        };
+        const thatUsers = await User.find(filter);
+        console.log(thatUsers);
+        if (thatUsers) {
+          let convertedArray;
+          if (thatUsers.length === undefined) {
+            convertedArray = [thatUsers];
+          } else {
+            convertedArray = thatUsers;
+          }
+          const answer = convertedArray.find((elem) => {
+            return elem.id === uid;
+          });
+          if (answer) {
+            const numTimeRecorded = +updatedProduct.timeRecorded;
+            console.log('Time recorded is', numTimeRecorded);
+            // console.log(typeof numTimeRecorded, numTimeRecorded);
+            console.log('Timecount is', updatedProduct.timeCount);
+            const addSec = updatedProduct.timeCount * 1000;
+            console.log('Addition second is', addSec);
+            const futureTime = numTimeRecorded + addSec;
+            console.log('Time future is', futureTime);
+            console.log(Date.now() > futureTime);
 
-      if (Date.now() > futureTime) {
-        console.log('updated product.priceMin is', updatedProduct.priceMin);
-        updatedProduct.price = updatedProduct.priceMin;
-        updatedProduct.timeRecorded = '';
-        updatedProduct.viewsCount = 0;
-        console.log(updatedProduct.viewsCount);
-        updatedProduct.viewsId = [];
-      }
+            if (Date.now() > futureTime) {
+              console.log(
+                'updated product.priceMin is',
+                updatedProduct.priceMin
+              );
+              updatedProduct.price = updatedProduct.priceMin;
+              updatedProduct.timeRecorded = '';
+              updatedProduct.viewsCount = 0;
+              console.log(updatedProduct.viewsCount);
+              updatedProduct.viewsId = [];
+            }
 
-      const found = updatedProduct.viewsId.find((id) => {
-        return id === uid;
-      });
+            const found = updatedProduct.viewsId.find((id) => {
+              return id === uid;
+            });
 
-      if (!found) {
-        updatedProduct.viewsId.push(uid);
-        console.log('pushed is', updatedProduct.viewsId);
-        updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
-        updatedProduct.timeRecorded = Date.now().toString();
+            if (!found) {
+              updatedProduct.viewsId.push(uid);
+              console.log('pushed is', updatedProduct.viewsId);
+              updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
+              updatedProduct.timeRecorded = Date.now().toString();
+            } else {
+              // updatedProduct.viewsId.push(uid);
+              // updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
+              updatedProduct.timeRecorded = Date.now().toString();
+            }
+
+            if (updatedProduct.viewsCount > updatedProduct.thresholdCount) {
+              console.log('viewscount current', updatedProduct.viewsCount);
+              console.log(
+                'thresholdcount current',
+                updatedProduct.thresholdCount
+              );
+              console.log('Max price is', updatedProduct.priceMax);
+              updatedProduct.price = updatedProduct.priceMax;
+            }
+
+            // console.log(typeof updatedProduct, updatedProduct);
+            // const found = updatedProduct.viewsId.find((id) => {
+            //   return id === uid;
+            // });
+            // const numTimeRecorded = +updatedProduct.timeRecorded;
+            // console.log('Time recorded is', numTimeRecorded);
+            // // console.log(typeof numTimeRecorded, numTimeRecorded);
+            // console.log('Timecount is', updatedProduct.timeCount);
+            // const addSec = updatedProduct.timeCount * 1000;
+            // console.log('Addition second is', addSec);
+            // const futureTime = numTimeRecorded + addSec;
+            // console.log('Time future is', futureTime);
+            // console.log(Date.now() > futureTime);
+            // if (Date.now() > futureTime) {
+            //   console.log('updated product.priceMin is', updatedProduct.priceMin);
+            //   updatedProduct.price = updatedProduct.priceMin;
+            //   updatedProduct.timeRecorded = '';
+            //   updatedProduct.viewsCount = 0;
+            //   console.log(updatedProduct.viewsCount);
+            //   updatedProduct.viewsId = '';
+            //   updatedProduct.viewsId.push(uid);
+            //   updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
+            //   updatedProduct.timeRecorded = Date.now().toString();
+            //   console.log('Executred Time greater');
+            // }
+            // if (!found) {
+            //   updatedProduct.viewsId.push(uid);
+            //   console.log('pushed is', updatedProduct.viewsId);
+            //   updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
+            //   updatedProduct.timeRecorded = Date.now().toString();
+            // } else {
+            //   // updatedProduct.viewsId.push(uid);
+            //   // updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
+            //   updatedProduct.timeRecorded = Date.now().toString();
+            //   if (updatedProduct.viewsCount > updatedProduct.thresholdCount) {
+            //     updatedProduct.price = updatedProduct.priceMax;
+            //   }
+            // }
+
+            // console.log(updatedProduct);
+            const storeProduct = await Product.findByIdAndUpdate(
+              req.params.id,
+              {
+                // name: req.body.name,
+                // description: req.body.description,
+                // richDescription: req.body.richDescription,
+                // image: imagePath,
+                // brand: req.body.brand,
+                price: updatedProduct.price,
+                // priceMax: req.body.priceMax,
+                // priceMin: req.body.price,
+                // thresholdCount: req.body.thresholdCount,
+                // timeCount: req.body.timeCount,
+                // category: req.body.category,
+                // countInStock: req.body.countInStock,
+                // rating: req.body.rating,
+                // numReviews: req.body.numReviews,
+                // isFeatured: req.body.isFeatured,
+                timeRecorded: updatedProduct.timeRecorded,
+                viewsCount: updatedProduct.viewsCount,
+                viewsId: updatedProduct.viewsId,
+              },
+              { new: true }
+            );
+            console.log(storeProduct);
+            // console.log(typeof uid, uid);
+            const product = await Product.findById(req.params.id);
+            if (!product) {
+              return res.status(500).json({
+                success: false,
+              });
+            } else {
+              return res.send(product);
+            }
+          } else {
+            const productDefault = await Product.findById(req.params.id);
+            productDefault.price = productDefault.priceMin;
+            const storeProduct1 = await Product.findByIdAndUpdate(
+              req.params.id,
+              {
+                price: productDefault.price,
+              },
+              { new: true }
+            );
+            console.log(storeProduct1);
+            const productFinal = await Product.findById(req.params.id);
+            if (!productFinal) {
+              return res.status(500).json({
+                success: false,
+              });
+            } else {
+              return res.send(productFinal);
+            }
+          }
+        } else {
+          const productDefault = await Product.findById(req.params.id);
+          productDefault.price = productDefault.priceMin;
+          const storeProduct1 = await Product.findByIdAndUpdate(
+            req.params.id,
+            {
+              price: productDefault.price,
+            },
+            { new: true }
+          );
+          console.log(storeProduct1);
+          const productFinal = await Product.findById(req.params.id);
+          if (!productFinal) {
+            return res.status(500).json({
+              success: false,
+            });
+          } else {
+            return res.send(productFinal);
+          }
+        }
       } else {
-        // updatedProduct.viewsId.push(uid);
-        // updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
-        updatedProduct.timeRecorded = Date.now().toString();
+        const productDefault = await Product.findById(req.params.id);
+        productDefault.price = productDefault.priceMin;
+        const storeProduct1 = await Product.findByIdAndUpdate(
+          req.params.id,
+          {
+            price: productDefault.price,
+          },
+          { new: true }
+        );
+        console.log(storeProduct1);
+        const productFinal = await Product.findById(req.params.id);
+        if (!productFinal) {
+          return res.status(500).json({
+            success: false,
+          });
+        } else {
+          return res.send(productFinal);
+        }
       }
 
-      if (updatedProduct.viewsCount > updatedProduct.thresholdCount) {
-        console.log('viewscount current', updatedProduct.viewsCount);
-        console.log('thresholdcount current', updatedProduct.thresholdCount);
-        console.log('Max price is', updatedProduct.priceMax);
-        updatedProduct.price = updatedProduct.priceMax;
-      }
-
-      // console.log(typeof updatedProduct, updatedProduct);
-      // const found = updatedProduct.viewsId.find((id) => {
-      //   return id === uid;
-      // });
-      // const numTimeRecorded = +updatedProduct.timeRecorded;
-      // console.log('Time recorded is', numTimeRecorded);
-      // // console.log(typeof numTimeRecorded, numTimeRecorded);
-      // console.log('Timecount is', updatedProduct.timeCount);
-      // const addSec = updatedProduct.timeCount * 1000;
-      // console.log('Addition second is', addSec);
-      // const futureTime = numTimeRecorded + addSec;
-      // console.log('Time future is', futureTime);
-      // console.log(Date.now() > futureTime);
-      // if (Date.now() > futureTime) {
-      //   console.log('updated product.priceMin is', updatedProduct.priceMin);
-      //   updatedProduct.price = updatedProduct.priceMin;
-      //   updatedProduct.timeRecorded = '';
-      //   updatedProduct.viewsCount = 0;
-      //   console.log(updatedProduct.viewsCount);
-      //   updatedProduct.viewsId = '';
-      //   updatedProduct.viewsId.push(uid);
-      //   updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
-      //   updatedProduct.timeRecorded = Date.now().toString();
-      //   console.log('Executred Time greater');
-      // }
-      // if (!found) {
-      //   updatedProduct.viewsId.push(uid);
-      //   console.log('pushed is', updatedProduct.viewsId);
-      //   updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
-      //   updatedProduct.timeRecorded = Date.now().toString();
-      // } else {
-      //   // updatedProduct.viewsId.push(uid);
-      //   // updatedProduct.viewsCount = updatedProduct.viewsCount + 1;
-      //   updatedProduct.timeRecorded = Date.now().toString();
-      //   if (updatedProduct.viewsCount > updatedProduct.thresholdCount) {
-      //     updatedProduct.price = updatedProduct.priceMax;
-      //   }
-      // }
-
-      // console.log(updatedProduct);
-      const storeProduct = await Product.findByIdAndUpdate(
+      // console.log(typeof req.params.id);
+    } else {
+      const productDefault = await Product.findById(req.params.id);
+      productDefault.price = productDefault.priceMin;
+      const storeProduct1 = await Product.findByIdAndUpdate(
         req.params.id,
         {
-          // name: req.body.name,
-          // description: req.body.description,
-          // richDescription: req.body.richDescription,
-          // image: imagePath,
-          // brand: req.body.brand,
-          price: updatedProduct.price,
-          // priceMax: req.body.priceMax,
-          // priceMin: req.body.price,
-          // thresholdCount: req.body.thresholdCount,
-          // timeCount: req.body.timeCount,
-          // category: req.body.category,
-          // countInStock: req.body.countInStock,
-          // rating: req.body.rating,
-          // numReviews: req.body.numReviews,
-          // isFeatured: req.body.isFeatured,
-          timeRecorded: updatedProduct.timeRecorded,
-          viewsCount: updatedProduct.viewsCount,
-          viewsId: updatedProduct.viewsId,
+          price: productDefault.price,
         },
         { new: true }
       );
-      console.log(storeProduct);
-      console.log('Hellooooooooooooooooooooo');
-      // console.log(typeof uid, uid);
+      console.log(storeProduct1);
+      const productFinal = await Product.findById(req.params.id);
+      if (!productFinal) {
+        return res.status(500).json({
+          success: false,
+        });
+      } else {
+        return res.send(productFinal);
+      }
     }
-    // console.log(typeof req.params.id);
+  } else {
+    const productDefault = await Product.findById(req.params.id);
+    productDefault.price = productDefault.priceMin;
+    const storeProduct1 = await Product.findByIdAndUpdate(
+      req.params.id,
+      {
+        price: productDefault.price,
+      },
+      { new: true }
+    );
+    console.log(storeProduct1);
+    const productFinal = await Product.findById(req.params.id);
+    if (!productFinal) {
+      return res.status(500).json({
+        success: false,
+      });
+    } else {
+      return res.send(productFinal);
+    }
   }
 
-  const product = await Product.findById(req.params.id);
-  if (!product) {
-    res.status(500).json({
-      success: false,
-    });
-  }
-  res.send(product);
+  // const product = await Product.findById(req.params.id);
+  // if (!product) {
+  //   res.status(500).json({
+  //     success: false,
+  //   });
+  // } else {
+  //   res.send(product);
+  // }
 });
 
 router.post(`/`, uploadOptions.single('image'), async (req, res) => {
@@ -378,6 +541,8 @@ router.post(`/`, uploadOptions.single('image'), async (req, res) => {
     isFeatured: req.body.isFeatured,
     geography: 'No',
     location: {},
+    pgeography: 'No',
+    plocation: {},
   });
   const product = await product1.save();
   if (!product) {
@@ -478,7 +643,7 @@ router.put('/geo/:id', async (req, res) => {
   // } else {
   //   imagePath = productPrevious.image;
   // }
-  console.log('Entering Calculation');
+  // console.log('Entering Calculation');
   try {
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
@@ -585,6 +750,81 @@ router.put('/delgeo/:id', async (req, res) => {
   return res.send(updatedProduct);
 });
 
+router.put('/geop/:id', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).send('Invalid Product id');
+  }
+  const category = await Category.findById(req.body.category);
+  if (!category) {
+    return res.status(400).send('Invalid Category');
+  }
+
+  const productPrevious = await Product.findById(req.params.id);
+  if (!productPrevious) {
+    return res.status(400).send('Invalid Product!');
+  }
+  try {
+    const updatedProduct = await Product.findByIdAndUpdate(
+      req.params.id,
+      {
+        pgeography: 'Yes',
+        plocation: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [req.body.pa1, req.body.pa2],
+              [req.body.pb1, req.body.pb2],
+              [req.body.pc1, req.body.pc2],
+              [req.body.pd1, req.body.pd2],
+              [req.body.pa1, req.body.pa2],
+            ],
+          ],
+        },
+      },
+      { new: true }
+    );
+
+    console.log(updatedProduct);
+    if (!updatedProduct) {
+      return res.status(500).send('the product cannot be updated!');
+    } else {
+      return res.send(updatedProduct);
+    }
+  } catch (error) {
+    return res.status(500).send('the product cannot be updated!');
+  }
+});
+
+router.put('/delgeop/:id', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).send('Invalid Product id');
+  }
+  const category = await Category.findById(req.body.category);
+  if (!category) {
+    return res.status(400).send('Invalid Category');
+  }
+
+  const productPrevious = await Product.findById(req.params.id);
+  if (!productPrevious) {
+    return res.status(400).send('Invalid Product!');
+  }
+  const updatedProduct = await Product.findByIdAndUpdate(
+    req.params.id,
+    {
+      pgeography: 'No',
+      plocation: {
+        // type: 'Polygon',
+        // coordinates: [[[]]],
+      },
+    },
+    { new: true }
+  );
+  if (!updatedProduct) {
+    return res.status(500).send('the product cannot be updated!');
+  }
+  return res.send(updatedProduct);
+});
+
 router.delete('/:id', (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).send('Invalid Product id');
@@ -639,8 +879,8 @@ router.get(`/get/featured/:count`, async (req, res) => {
         .status(500)
         .json({ message: 'The user with the given id is not found' });
     }
-    const latitude = user.latitude;
-    const longitude = user.longitude;
+    const latitude = user.userlocation.coordinates[1];
+    const longitude = user.userlocation.coordinates[0];
 
     if (req.headers.authorization && !extraction1Parsed.isAdmin) {
       const products = await Product.find({

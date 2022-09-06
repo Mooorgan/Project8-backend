@@ -24,8 +24,9 @@ router.get('/:id', async (req, res) => {
     return res
       .status(500)
       .json({ message: 'The user with the given id is not found' });
+  } else {
+    return res.status(200).send(user);
   }
-  return res.status(200).send(user);
 });
 
 router.post('/', async (req, res) => {
@@ -41,8 +42,10 @@ router.post('/', async (req, res) => {
     zip: req.body.zip.trim(),
     city: req.body.city.trim(),
     country: req.body.country,
-    latitude: req.body.latitude,
-    longitude: req.body.longitude,
+    userlocation: {
+      type: 'Point',
+      coordinates: [req.body.longitude, req.body.latitude],
+    },
   });
   try {
     user = await user.save();
@@ -79,8 +82,10 @@ router.put('/:id', async (req, res) => {
       zip: req.body.zip.trim(),
       city: req.body.city.trim(),
       country: req.body.country,
-      latitude: req.body.latitude,
-      longitude: req.body.longitude,
+      // userlocation: {
+      //   type: 'Point',
+      //   coordinates: [req.body.longitude, req.body.latitude],
+      // },
     },
     { new: true }
   );
@@ -128,8 +133,10 @@ router.post('/register', async (req, res) => {
     zip: req.body.zip.trim(),
     city: req.body.city.trim(),
     country: req.body.country,
-    latitude: req.body.latitude,
-    longitude: req.body.longitude,
+    userlocation: {
+      type: 'Point',
+      coordinates: [req.body.longitude, req.body.latitude],
+    },
   });
   user = await user.save();
   console.log(user);
@@ -180,7 +187,8 @@ router.get(`/get/count`, (req, res) => {
 });
 
 router.put('/locate/:id', async (req, res) => {
-  console.log(req.params.id);
+  console.log(req.params.id, 'this is id');
+  console.log(req.body, 'this is body');
   // const userExist = await User.findById(req.params.id);
   // let newPassword;
   // if (req.body.password) {
@@ -201,15 +209,19 @@ router.put('/locate/:id', async (req, res) => {
       // zip: req.body.zip,
       // city: req.body.city,
       // country: req.body.country,
-      latitude: req.body.latitude,
-      longitude: req.body.longitude,
+      userlocation: {
+        type: 'Point',
+        coordinates: [req.body.longitude, req.body.latitude],
+      },
     },
     { new: true }
   );
+  console.log(user);
   if (!user) {
     return res.status(404).send('the user cannot be updated!');
+  } else {
+    return res.send(user);
   }
-  return res.send(user);
 });
 
 module.exports = router;
