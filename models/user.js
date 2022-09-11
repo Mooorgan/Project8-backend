@@ -53,14 +53,14 @@ const userSchema = mongoose.Schema({
       default: undefined,
     },
   },
-  longitude: {
-    type: String,
-    required: true,
-  },
-  latitude: {
-    type: String,
-    required: true,
-  },
+  // longitude: {
+  //   type: String,
+  //   required: true,
+  // },
+  // latitude: {
+  //   type: String,
+  //   required: true,
+  // },
 });
 
 userSchema.virtual('id').get(function () {

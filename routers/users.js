@@ -50,6 +50,7 @@ router.post('/', async (req, res) => {
   try {
     user = await user.save();
   } catch (error) {
+    console.log(error);
     console.log(user, 'hello');
     return res.status(302).send('Email already exists.');
   }
